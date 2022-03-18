@@ -1,0 +1,514 @@
+---
+title: "Data622_HWk1"
+author: "Alexis Mekueko"
+date: "3/14/2022"
+output:
+  html_document: default
+  pdf_document: default
+  word_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+
+```{r load-packages, results='hide',warning=FALSE, message=FALSE, echo=FALSE}
+
+##library(tidyverse) #loading all library needed for this assignment
+
+
+library(knitr)
+library(dplyr)
+library(tidyr)
+
+library(stats)
+library(statsr)
+library(GGally)
+library(pdftools)
+library(correlation)
+library(naniar)
+
+library(urca)
+library(tsibble)
+library(tseries)
+library(forecast)
+library(caret)
+set.seed(34332)
+library(plyr)
+library(arules)
+library(arulesViz)
+library(report)
+library(cluster) # to perform different types of hierarchical clustering
+# package functions used: daisy(), diana(), clusplot()
+#install.packages("visdat")
+library(visdat)
+library(plotly)
+library(reshape2)
+library(mlbench)
+library(corrplot)
+library(pROC)
+library(prodlim)
+```
+
+
+[Github Link](https://github.com/asmozo24/Data622_HWK1)
+<br>
+[Web Link](https://rpubs.com/amekueko/845664)
+
+
+## Assignment:
+
+Visit the following website and explore the range of sizes of this dataset (from 100 to 5 million records).
+
+https://eforexcel.com/wp/downloads-18-sample-csv-files-data-sets-for-testing-sales/ 
+
+Based on your computer's capabilities (memory, CPU), select 2 files you can handle (recommended one small, one large)
+
+Review the structure and content of the tables, and think which two machine learning algorithms presented so far could be used to analyze the data, and how can they be applied in the suggested environment of the datasets.
+
+Write a short essay explaining your selection. Then, select one of the 2 algorithms and explore how to analyze and predict an outcome based on the data available. This will be an exploratory exercise, so feel free to show errors and warnings that raise during the analysis. Test the code with both datasets selected and compare the results. Which result will you trust if you need to make a business decision? Do you think an analysis could be prone to errors when using too much data, or when using the least amount possible?
+
+Develop your exploratory analysis of the data and the essay in the following 2 weeks. You'll have until March 17 to submit both.
+
+
+Exploratory Data Analysis (EDA)
+
+The process of analyzing and visualizing the data to get a better understanding of the data and glean insight from it. 
+
+
+## Impport Data and Data Structure
+
+We imported the data from local drive. Another option could be to load the date from Github.
+ 
+```{r, echo=FALSE}
+
+data1000R <- read.csv("1000 Sales Records.csv", stringsAsFactors=FALSE)
+# Loading data
+# df1 <- read.transactions('https://raw.githubusercontent.com/asmozo24/Data624_Market_Basket_Analysis/main/GroceryDataSet.csv', 
+#                             sep = ',', rm.duplicates = TRUE)
+
+#View(data1000R)
+#glimpse(basket)
+
+str(data1000R)
+
+data1000R %>%
+  head(8)%>%
+  kable()
+
+``` 
+
+The dataset "1000 Sales Records" has 1000 records or observations with 14 features. The datatypes in this dataset are characters and numericals. The characters datatype represent a designation of something. For example, name of a country where the customer is(I think so because it is not common to see vendors display information about the origin of a product they are selling) or it could be the name of the item a customer bought. The numericals datatype represent the finance of the shop/store for the most. This dataset is about recorded sale of a store which operates in hybrid environment selling various items to customers around the world. Based on this information about the structure of the dataset, we can conclude that we have a labeled data. Therefore, we can be confident in using supervised learning on this dataset. As we know, supervise learning is suitable for data that comes with labels(labeled data). 
+
+
+Since there is no a real problem statement on this dataset in order to apply the appropriate machine learning algorithm, we are going to formulate one or couple problems. For most profit businesses, profit is what drives the business. In most cases, businesses like to have a projection of future revenues in order to have a better planning. Looking at the revenue is almost looking at the profit. For this store, the most important factors that define the profit are the unit cost and the item type. Thus, one problem can be predicting the unit cost of each item or the popular item: Unit Prices Model. Another problem can be determine if the next customer purchase will be a popular or less popular item. 
+
+Unit Prices Model: This model is more suitable with forecast analysis. Since we have not talked about forecasting, the other option is regression analysis. In order to use the regression analysis, we need to know how the unit price of an item is made. However, we don't know what determine the value of an item. Whether it is the origin of the item or the market demand or maybe the combination of the two. So, we will predict the profit that each item can generate. In other words, we are looking at this problem with financial prospective such growth of the business. 
+
+For this store, we will limit the feature for total profit to the following: unit price, unit sold, unit cost, total revenue, total cost.
+
+## Cleaning Data
+
+```{r }
+
+#install.packages('Amelia')
+library(Amelia)
+sum(is.na(data1000R))
+missmap(data1000R,col=c('yellow','black'),y.at=1,y.labels='',legend=TRUE)
+
+
+#count((data1000R$Order.Priority))
+
+#sum(is.na(data1000R$Order.Priority))
+# Not sure why the code below does not work
+# data1000R %>% 
+#   group_by(data1000R$Order.Priority) %>%
+#   summarize(Count=n()) %>%
+#   mutate(Percent = (Count/sum(Count))*100) %>%
+#   arrange(desc(Count))
+```
+
+We clearly see that there is no missing data.
+
+## Processing Data
+
+Let's remove the variables that we don't need for this regression analysis. Then, we will reformat the dataset into a new data frame in which item type is grouped but this will define profit based on each item the store sells. This approach sounds somehow easy. When we think through on this approach, there is a potential bias that can be introduced into the new data frame and that is what happens if the unit price of a same item type differs from one region to another or from one country to another or from one date to another. All these presumptions appears to be realistic. Therefore, we want to explore the data to see whether such of price differentiation is indeed in the dataset.
+
+```{r }
+
+data1000R %>%
+  filter(Item.Type == "Cereal") %>%
+  head(10)
+
+data1000R %>%
+  filter(Item.Type == "Beverages") %>%
+  head(10)
+
+data1000R %>%
+  group_by(Item.Type)
+
+```
+
+Based on the item type "Cereal", we observed that the price does not really change regardless of other factors. Meaning the unit price is fixed. We have verified the presumption for one item. How about other items sold by this store? We used groupby() function and since we didn't get any error, we will assume the presumption is also verified for all items sold by the store. There might be a global view to see all items by individual table. Now we have verified the presumption, we can remove unnecessary variables. 
+
+```{r }
+library(data.table)
+# We want to check which item is popular.
+data2 <- data.table( ItemType = data1000R$Item.Type)
+data2[,.(count = .N), by = ItemType][, percent := prop.table(count)*100][]
+
+data1000R1 <- data1000R %>%
+  filter(Item.Type == "Beverages") %>%
+                select(-c(Region,Order.Priority, Order.Date, Order.ID, Ship.Date, Item.Type, Sales.Channel,Country))
+
+data1000R1
+```
+
+
+### Summary and Correlation
+
+This is a summary and correlation of the popular item known as "Beverage"
+
+```{r }
+
+
+  summary(data1000R1)
+
+#as.numeric(data1000R1$Units.Sold)
+#library(Hmisc)
+#data1 <- data.frame(data1000R1)
+cor(data1000R1)
+#cor(data1000R1[,unlist(lapply(data1000R1, is.numeric))])
+#rcorr(as.matrix(data1000R1), type = "Pearson")
+
+```
+
+Something is wrong with the correlation. we think the fact that the unit price is fixed might be the cause of such correlation output.
+
+## Building Model 1 +Visualization
+
+
+```{r }
+
+# # load package
+# #install.packages("ggstatsplot")
+# library(ggstatsplot)
+# 
+# # correlogram
+# ggstatsplot::ggcorrmat(
+#   data = data1000R1,
+#   type = "parametric", # parametric for Pearson, nonparametric for Spearman's correlation
+#   colors = c("darkred", "white", "steelblue") # change default colors
+# )
+
+set.seed(232)
+
+library(caTools)
+data1000R1s <- sample.split(data1000R1, SplitRatio = 0.70)
+train1 <- subset(data1000R1, data1000R1s == TRUE)
+test1 <- subset(data1000R1, data1000R1s == FALSE)
+
+model1 <- lm(Total.Profit~., train1)
+summary(model1)
+plot (model1, which = 2)
+
+plot (model1, which = 1)
+
+```
+
+There is something strange on the regression performance. The R-squared value is perfect showing only one variable (Unit.Sold) has influence on the total profit. The multilinear regression model could be just a simple linear regression model. This is a bit hard to admit. We want to try to call another function for partionning the data. 
+
+
+```{r }
+partition <- createDataPartition(data1000R1$Total.Profit, p = 0.70, list = FALSE)
+train1s <- data1000R1[partition,]
+test1s <- data1000R1[-partition,]
+dim(train1s)
+dim(test1s)
+
+# Fitting the model
+model1s <- lm(Total.Profit~Units.Sold
++ Unit.Price+Unit.Cost+Total.Revenue
++Total.Cost, data = train1s)
+summary(model1s)
+plot(model1s, which = 2)
+
+```
+
+Same results!
+
+
+### Model1 Accuracy
+
+```{r }
+
+pred1 <- predict(model1s, newdata = test1s)
+
+check <- data.frame(test1s$Total.Profit, pred1, residuals = test1s$Total.Profit - pred1)
+check
+
+MSE <- mean((test1s$Total.Profit - pred1)^2)
+print(MSE)
+
+test1s$Predicted.TotalProfit <- predict(model1s,test1s)
+actual_pred <- data.frame(test1s$Total.Profit, test1s$Predicted.TotalProfit)
+names(actual_pred) <- c("Actual.Total.Profit", "Predicted.Total.Profit" )
+accuracy1 <- cor(actual_pred)
+accuracy1
+head(actual_pred)
+
+test1s$Predicted.TotalProfit <- predict(model1s,test1s)
+plot1s <-test1s %>% 
+  ggplot(aes(Total.Profit,Predicted.TotalProfit)) +
+  geom_point(alpha=0.5) + 
+  stat_smooth(aes(colour='black')) +
+  xlab('Actual value of Total Profit for Beverages') +
+  ylab('Predicted value of Beverages')+
+  theme_bw()
+ggplotly(plot1s)
+
+```
+
+Unusual results we shall say. The correlation shows that Model accuracy is 100%. At this point, not sure what to think of. Another idea is that the approach was not good or the formulation of the problem statement was not correct or sufficiant.
+
+We built a model for the most popular item sold by the store. What if we want to predict the total profit generated by all the items sold by the store. This is a bit complex but can be solvable. Let's try to see if we will get the same result with a bigger dataset (one million records).
+
+
+```{r }
+
+data1000000R <- read.csv("1000000 Sales Records.csv", stringsAsFactors=FALSE)
+# Loading data
+# df1 <- read.transactions('https://raw.githubusercontent.com/asmozo24/Data624_Market_Basket_Analysis/main/GroceryDataSet.csv', 
+#                             sep = ',', rm.duplicates = TRUE)
+
+View(data1000000R)
+#glimpse(basket)
+
+str(data1000000R)
+# 
+# data1000R %>%
+#   head(8)%>%
+#   kable()
+
+```
+
+
+
+```{r }
+library('data.table')
+# data1 <- data.table( orderPriority = data1000R$Order.Priority)
+# data1[,.(count = .N), by = orderPriority][, percent := prop.table(count)*100][]
+
+
+
+```
+
+
+
+We will reproduce the same code used on the 1000 records dataset.
+
+```{r }
+
+sum(is.na(data1000000R))
+
+data3 <- data.table( ItemType = data1000000R$Item.Type)
+data3[,.(count = .N), by = ItemType][, percent := prop.table(count)*100][]
+
+data1000000R1 <- data1000000R %>%
+  filter(Item.Type == "Fruits") %>%
+                select(-c(Region,Order.Priority, Order.Date, Order.ID, Ship.Date, Item.Type, Sales.Channel,Country))
+
+data1000000R1
+
+```
+
+### Building Model2 
+
+```{r }
+
+partition2 <- createDataPartition(data1000000R1$Total.Profit, p = 0.70, list = FALSE)
+train2s <- data1000000R1[partition,]
+test2s <- data1000000R1[-partition,]
+dim(train2s)
+dim(test2s)
+
+# Fitting the model
+model2s <- lm(Total.Profit~Units.Sold
++ Unit.Price+Unit.Cost+Total.Revenue
++Total.Cost, data = train1s)
+summary(model2s)
+plot(model2s, which = 2)
+
+
+```
+
+
+### Model2 Accuracy
+
+```{r }
+
+pred2 <- predict(model2s, newdata = test2s)
+
+check2 <- data.frame(test2s$Total.Profit, pred2, residuals = test2s$Total.Profit - pred2)
+check2
+
+MSE <- mean((test2s$Total.Profit - pred2)^2)
+print(MSE)
+
+test2s$Predicted.TotalProfit <- predict(model2s,test2s)
+actual_pred2 <- data.frame(test2s$Total.Profit, test2s$Predicted.TotalProfit)
+names(actual_pred2) <- c("Actual.Total.Profit", "Predicted.Total.Profit" )
+accuracy2 <- cor(actual_pred2)
+accuracy2
+head(actual_pred2)
+
+test2s$Predicted.TotalProfit <- predict(model2s,test2s)
+plot2s <-test2s %>% 
+  ggplot(aes(Total.Profit,Predicted.TotalProfit)) +
+  geom_point(alpha=0.5) + 
+  stat_smooth(aes(colour='black')) +
+  xlab('Actual value of Total Profit for Fruits') +
+  ylab('Predicted value of Fruits')+
+  theme_bw()
+ggplotly(plot2s)
+
+```
+
+We obtain the Same result with one million records compared to the 1000 records.
+
+Another problem we could articulate on these dataset is: Predict if the next customer purchase is a popular item or not. In order to do this, we would have to generate a new variable called "Popularity" which can take value 1 or 0 or yes/no. This variable would be based on certain criteria that we wish there were given. Rather, we can try to determine the priority of the next customer order. We can use decision tree to predict the priority of the next customer order. 
+
+
+```{r }
+
+
+data3 <- data.table( OrderPriority = data1000R$Order.Priority)
+data3[,.(count = .N), by = OrderPriority][, percent := prop.table(count)*100][]
+
+#data1000R2 <- data1000R %>%
+#  group_by(Order.Priority)
+
+
+```
+
+
+Looking at the features within the dataset, it is bit hard to say whether variables like Region, Country , Sale.Channel, Item.Type, Order.ID, and Order.Date.
+We say so because there is no really trend or logic observed for each of this variable having influence over the order priority. We make assumption that the variables we used for the regression analysis also have influence on the order priority.
+
+
+
+```{r }
+
+data1000R$Order.Priority <- as.factor(data1000R$Order.Priority)
+#str(data1000R2)
+
+data1000R2 <- data1000R %>%
+  select(-c(Region,Order.Date, Order.ID, Ship.Date, Item.Type, Sales.Channel,Country))
+
+data1000R2 %>%
+  head(6)
+
+```
+
+
+
+### Build Model 3 Based Decision Tree
+
+```{r }
+
+library(party)
+
+data4 = sample.split(data1000R2, SplitRatio = 0.70)
+train4 <- subset(data1000R2, data4 == TRUE)
+test4 <- subset(data1000R2, data4 == FALSE)
+model4 <- ctree(Order.Priority ~ ., train4)
+plot(model4)
+
+
+
+```
+
+### Prediction
+
+```{r}
+pred4 <- predict(model4, test4)
+classifier <- table(test4$Order.Priority, pred4)
+classifier
+
+```
+
+The model4 correctly predicted the next customer order to be only Order Priority "C". 
+
+### Model4 Accuracy
+
+```{r }
+accuracy4 <- sum(diag(classifier))/sum(classifier)
+accuracy4
+
+```
+The model 4 accuracy is about 21.5% which is relative low. 
+
+```{r }
+
+data1000000R$Order.Priority <- as.factor(data1000000R$Order.Priority)
+#str(data1000R2)
+
+data1000000R2 <- data1000000R %>%
+  select(-c(Region,Order.Date, Order.ID, Ship.Date, Item.Type, Sales.Channel,Country))
+
+
+data5 = sample.split(data1000000R2, SplitRatio = 0.70)
+train5 <- subset(data1000000R2, data5 == TRUE)
+test5 <- subset(data1000000R2, data5 == FALSE)
+model5 <- ctree(Order.Priority ~ ., train4)
+summary(model5)
+plot(model5)
+
+pred5 <- predict(model5, test5)
+classifier2 <- table(test5$Order.Priority, pred5)
+classifier2
+
+accuracy5 <- sum(diag(classifier2))/sum(classifier2)
+accuracy5
+
+```
+
+We got the same result with one million records compared to 1000 records. In conclusion, We want to say that the increasing the number of records for this dataset did not have an influence on the performance of the two machine learning algorithms (multilinear regression and decision tree).
+
+
+## References
+
+https://rpubs.com/ezrasote/housepricing
+
+https://medium.com/@aqureshi/multiple-linear-regression-using-r-to-predict-housing-prices-c1ba7fe1674a
+
+https://medium.com/@aqureshi/exploratory-data-analysis-in-r-using-the-no-show-hospital-appointments-data-9ce112112f
+
+https://towardsdatascience.com/exploratory-data-analysis-in-r-for-beginners-fe031add7072
+
+https://livebook.manning.com/book/grokking-machine-learning/2-1-what-is-the-difference-between-labelled-and-unlabelled-data-/v-4/50
+
+https://deepsense.ai/what-is-reinforcement-learning-the-complete-guide/
+
+https://pages.mtu.edu/~shanem/psy5220/daily/Day12/classification.html
+
+https://datascienceplus.com/how-to-perform-logistic-regression-lda-qda-in-r/#:~:text=LDA%20(Linear%20Discriminant%20Analysis)%20is,for%20all%20class%20is%20normal.
+
+https://uc-r.github.io/naive_bayes
+
+https://techvidvan.com/tutorials/classification-in-r/
+
+https://www.geeksforgeeks.org/decision-tree-in-r-programming/
+
+https://rstudio-pubs-static.s3.amazonaws.com/259348_2127bacd02b6420ea19851f8534a9b68.html
+
+https://www.edureka.co/blog/random-forest-classifier/
+
+https://www.guru99.com/r-decision-trees.html
+
+https://www.geeksforgeeks.org/decision-tree-classifiers-in-r-programming/?ref=rp
+
+https://www.geeksforgeeks.org/machine-learning/?ref=shm#su
+
